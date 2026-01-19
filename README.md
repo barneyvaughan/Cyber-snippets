@@ -25,11 +25,11 @@ A 30cm × 30cm touchscreen clock interface running on Raspberry Pi, combining gr
 
 ### Prerequisites
 
-- Raspberry Pi 4 with Raspberry Pi OS
+- Raspberry Pi 4 with Raspberry Pi OS (64-bit recommended)
 - Node.js 18+ and npm
 - Python 3.9+
 
-### Installation
+### Installation on Raspberry Pi
 
 ```bash
 # Clone the repository
@@ -37,32 +37,247 @@ git clone https://github.com/your-username/grandclock-pi.git
 cd grandclock-pi
 
 # Run the installation script
+chmod +x scripts/install.sh
 ./scripts/install.sh
 ```
 
-### Development
+---
 
-**Backend:**
+## Running & Accessing from Another Device
+
+The Pi runs the server; any device on the same network can view the clock in a browser.
+
+### Option 1: Development Mode (with Hot Reload)
+
+**On the Raspberry Pi:**
+
 ```bash
+cd ~/grandclock
+
+# Terminal 1: Start the backend
 cd backend
-python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
 python app.py
-```
 
-**Frontend:**
-```bash
+# Terminal 2: Start the frontend (expose to network)
 cd frontend
-npm install
-npm run dev
+npm run dev -- --host 0.0.0.0
 ```
 
-### Production (Kiosk Mode)
+**On your laptop/phone browser:**
+
+1. Find your Pi's IP: `hostname -I` (on the Pi)
+2. Navigate to `http://<pi-ip>:5173`
+
+Example: `http://192.168.1.42:5173`
+
+### Option 2: Docker (Production)
+
+```bash
+cd ~/grandclock
+docker-compose up -d
+```
+
+Access at `http://<pi-ip>:3000`
+
+---
+
+## Remote Development via SSH
+
+You can SSH into the Pi, edit code, and see changes instantly in your laptop's browser. Vite's Hot Module Replacement (HMR) updates the UI in real-time without refreshing.
+
+### Workflow
+
+```
+┌─────────────────┐         SSH          ┌─────────────────┐
+│     Laptop      │ ───────────────────▶ │  Raspberry Pi   │
+│                 │                      │                 │
+│  Browser at     │ ◀─── WebSocket ───── │  Vite Dev       │
+│  Pi-IP:5173     │      (HMR)           │  Server         │
+│                 │                      │                 │
+│  Code Editor    │ ───── SSH/SFTP ────▶ │  Project Files  │
+│  (VS Code, vim) │                      │                 │
+└─────────────────┘                      └─────────────────┘
+```
+
+### Setup with VS Code Remote SSH
+
+1. Install the "Remote - SSH" extension in VS Code
+2. Connect to Pi: `Ctrl+Shift+P` → "Remote-SSH: Connect to Host"
+3. Enter `pi@<pi-ip>` (e.g., `pi@192.168.1.42`)
+4. Open the project folder `/home/pi/grandclock`
+5. Edit files directly - changes appear instantly in your browser!
+
+### Setup with Terminal SSH
+
+```bash
+# From your laptop
+ssh pi@192.168.1.42
+
+# On the Pi, start the servers (use tmux or screen for persistence)
+tmux new -s grandclock
+
+# Start backend in one pane
+cd ~/grandclock/backend
+source venv/bin/activate
+python app.py
+
+# Split pane (Ctrl+B, %) and start frontend
+cd ~/grandclock/frontend
+npm run dev -- --host 0.0.0.0
+
+# Detach with Ctrl+B, D (servers keep running)
+# Reattach later with: tmux attach -t grandclock
+```
+
+Now edit files via SSH and watch your browser update live!
+
+### What Updates in Real-Time?
+
+| Change | Hot Reload? |
+|--------|-------------|
+| React components (widgets) | ✅ Instant |
+| CSS/styles | ✅ Instant |
+| Theme files | ✅ Instant |
+| Layout JSON | ✅ Instant |
+| TypeScript types | ✅ Instant |
+| Backend Python | ❌ Restart required |
+| config.yaml | ❌ Restart required |
+
+---
+
+## Auto-Start on Boot
+
+### Using systemd (Recommended)
+
+```bash
+# Create the service file
+sudo tee /etc/systemd/system/grandclock.service << 'EOF'
+[Unit]
+Description=GrandClock Pi
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/grandclock
+ExecStart=/usr/bin/docker-compose up
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start
+sudo systemctl daemon-reload
+sudo systemctl enable grandclock
+sudo systemctl start grandclock
+
+# Check status
+sudo systemctl status grandclock
+```
+
+### Without Docker (Development Mode Auto-Start)
+
+```bash
+sudo tee /etc/systemd/system/grandclock.service << 'EOF'
+[Unit]
+Description=GrandClock Pi
+After=network.target
+
+[Service]
+Type=forking
+User=pi
+WorkingDirectory=/home/pi/grandclock
+ExecStart=/home/pi/grandclock/scripts/start-dev.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+Create the start script:
+
+```bash
+cat > ~/grandclock/scripts/start-dev.sh << 'EOF'
+#!/bin/bash
+cd /home/pi/grandclock
+
+# Start backend
+cd backend
+source venv/bin/activate
+python app.py &
+
+# Start frontend
+cd ../frontend
+npm run dev -- --host 0.0.0.0 &
+EOF
+
+chmod +x ~/grandclock/scripts/start-dev.sh
+```
+
+---
+
+## Kiosk Mode (Fullscreen on Pi Display)
+
+To run fullscreen on the Pi's own touchscreen:
 
 ```bash
 ./scripts/kiosk.sh
 ```
+
+This launches Chromium in kiosk mode pointing to the local server.
+
+### Auto-Start Kiosk on Boot
+
+Add to `/etc/xdg/lxsession/LXDE-pi/autostart`:
+
+```
+@/home/pi/grandclock/scripts/kiosk.sh
+```
+
+---
+
+## Network Requirements
+
+- Pi and viewing device must be on the same local network
+- Required ports:
+  - `5173` - Vite dev server (development)
+  - `3000` - Nginx (Docker/production)
+  - `5000` - Flask backend API
+
+### Firewall (if enabled)
+
+```bash
+sudo ufw allow 5173/tcp
+sudo ufw allow 3000/tcp
+sudo ufw allow 5000/tcp
+```
+
+---
+
+## Troubleshooting
+
+### Can't connect from laptop
+
+1. Check Pi's IP: `hostname -I`
+2. Verify servers are running: `curl http://localhost:5173`
+3. Check firewall: `sudo ufw status`
+4. Ensure `--host 0.0.0.0` flag is used with Vite
+
+### HMR not working
+
+1. Check WebSocket connection in browser dev tools
+2. Ensure port 5173 is accessible
+3. Try disabling browser extensions
+
+### GPIO not working
+
+1. Ensure running as user with GPIO access: `groups` (should show `gpio`)
+2. Check if running on actual Pi vs development machine
+3. Backend falls back to mock GPIO on non-Pi systems
 
 ## Project Structure
 
