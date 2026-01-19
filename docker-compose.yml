@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/config.yaml:/app/config.yaml
+      - ./assets/sounds:/app/sounds
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+    # Uncomment for GPIO access on Raspberry Pi
+    # privileged: true
+    # devices:
+    #   - /dev/gpiomem:/dev/gpiomem
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

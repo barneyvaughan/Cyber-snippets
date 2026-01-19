@@ -1,0 +1,46 @@
+display:
+  width: 800
+  height: 800
+  rotation: 0
+  brightness: 100
+  brightness_night: 30
+
+theme:
+  active: "grandfather-oak"
+
+layout:
+  active: "grandfather-default"
+
+clock:
+  timezone: "Europe/London"
+  show_seconds: true
+
+chime:
+  enabled: true
+  sound: "westminster"
+  volume: 70
+  hours_only: true
+
+night_mode:
+  enabled: false
+  auto: true
+  start: "22:00"
+  end: "07:00"
+  dim_display: true
+  disable_chime: true
+
+calendar:
+  enabled: true
+  provider: "google"
+  calendar_ids:
+    - "primary"
+  refresh_interval: 300
+  max_events: 5
+  lookahead_hours: 24
+
+weather:
+  enabled: false
+  provider: "openweathermap"
+  api_key: ""
+  location: "Wirral,UK"
+  units: "metric"

@@ -1,0 +1,25 @@
+{
+  "id": "modern-grid",
+  "name": "Modern Grid",
+  "grid": {
+    "columns": 12,
+    "rows": 12,
+    "gap": 12
+  },
+  "widgets": [
+    {
+      "widgetId": "clock-analogue",
+      "x": 2,
+      "y": 1,
+      "w": 8,
+      "h": 8
+    },
+    {
+      "widgetId": "status-bar",
+      "x": 0,
+      "y": 10,
+      "w": 12,
+      "h": 2
+    }
+  ]
+}
